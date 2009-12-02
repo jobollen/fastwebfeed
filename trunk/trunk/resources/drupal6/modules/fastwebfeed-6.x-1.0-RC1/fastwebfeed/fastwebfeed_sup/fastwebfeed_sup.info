@@ -1,0 +1,7 @@
+; $Id$
+name = Fastwebfeed  SimpleUpdateProcotol (SUP)
+description = Module to extend feeds with the SimpleUpdateProtocol (SUP) definition
+package = fastwebfeed
+dependencies[] = fastwebfeed
+core = 6.x
+version = "6.x-1.0-RC1"

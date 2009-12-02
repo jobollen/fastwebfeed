@@ -1,0 +1,8 @@
+; $Id$
+name = Fastwebfeed (commentrss.module)
+description = Module to invoke the fastwebfeed with RSS feeds for comments
+package = fastwebfeed
+dependencies[] = fastwebfeed
+dependencies[] = commentrss
+core = 6.x
+version = "6.x-1.0-RC1"

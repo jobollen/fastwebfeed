@@ -1,0 +1,407 @@
+<?php
+// $Id$
+/**
+ * @file
+ * fastwebfeed_commentrss.module
+ * 
+ * This a ".module"-file. 
+ * 
+ * @author Jo Bollen <fastwebfeed@gmail.com>
+ * @site http://cupid-project.be/project/fastwebfeed-module
+ * @filesource
+ */
+
+/**
+ * Implementation of the hook_menu_alter()
+ */
+function fastwebfeed_commentrss_menu_alter(&$items) {
+  $items['crss'] = array(
+    'title' => '',
+    'page callback' => 'fastwebfeed_commentrss_handler_commentrss',
+    'page arguments' => array(1, 2),
+    'access arguments' => array('access comments'),
+    'type' => MENU_CALLBACK,
+  );
+}
+
+/**
+ * Implementation of the hook_fastwebfeed_description()
+ * Returns a piece of the Fastwebfeed admin info form
+ * 
+ * @return $output
+ *   string
+ *   
+ * @see fastwebfeed.module
+ */
+function fastwebfeed_commentrss_fastwebfeed_description() {
+  global $base_path;
+  $module_path = drupal_get_path('module', 'fastwebfeed');
+  $module_path_sup = drupal_get_path('module', 'fastwebfeed_sup');
+  $module_path_pubsubhubbub = drupal_get_path('module', 'fastwebfeed_pubsubhubbub');
+  $module_path_commentrss = drupal_get_path('module', 'fastwebfeed_commentrss');
+  
+  $output = '
+  		<ul>
+    		<li>fastwebfeed_commentrss.module
+      		<ul>
+      			<li>Settings: '. l('Administer > Site configuration > Fastwebfeed > plugged modules - "Settings for the commentrss.module"', 'admin/settings/fastwebfeed/plugged_modules') .'</li>
+      			<li>Read '. l('CHANGELOG.txt', $module_path_commentrss .'/CHANGELOG.txt') .'</li>
+      		</ul>
+      	</li>
+    	</ul>';
+  return $output;
+}
+
+/**
+ * Implementation of the hook_fastwebfeed_plugged_modules_admin()
+ * A piece of the Fastwebfeed admin setting form
+ * Administer -> Site configuration -> fastwebfeed -> plugged modules
+ * 
+ * @return array $form 
+ * 
+ * @see fastwebfeed.module
+ */
+function fastwebfeed_commentrss_fastwebfeed_plugged_modules_admin() {
+  global $base_url, $base_path;
+  $fastwebfeed_sup_module_path = drupal_get_path('module', 'fastwebfeed_commentrss');
+  $fastwebfeed_module_path = drupal_get_path('module', 'fastwebfeed');
+  
+  $form['fieldset_fastwebfeed_commentrss'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Settings for the commentrss.module'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  $form['fieldset_fastwebfeed_commentrss']['fieldset_commentrss_when_to_ping'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('When to ping (or notify)?'),
+    '#description' => t('The question is, when to ping a service (or notify a hub) with an updated "comment" feeds?'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  $form['fieldset_fastwebfeed_commentrss']['fieldset_commentrss_when_to_ping']['fastwebfeed_commentrss_check_ping_on_comment_submission_admin'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('On "comment" submission.'),
+    '#description' => t('If checked, the hubs/services will be notified on "comment" submission with a update notification refered to the updated "comment" feeds.'),
+    '#default_value' => variable_get('fastwebfeed_commentrss_check_ping_on_comment_submission_admin', ''),
+  );
+  
+  $form['fieldset_fastwebfeed_commentrss']['fieldset_commentrss_what_to_ping'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('What to ping (or notify)?'),
+    '#description' => t('The question is, which "comment" feed must be pinged to a service? (or which feed must be notified to a hub?)'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  $form['fieldset_fastwebfeed_commentrss']['fieldset_commentrss_what_to_ping']['fieldset_crss_feed'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('crss feed'),
+    '#description' => t('<em>example: '. l($base_url . $base_path .'crss', 'crss', array('attributes' => array('target' => '_blank'))) .'</em>'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  $form['fieldset_fastwebfeed_commentrss']['fieldset_commentrss_what_to_ping']['fieldset_crss_feed']['fastwebfeed_commentrss_check_crss_feed_admin'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Crss'),
+    '#description' => t('If checked, the following "comment" feed will be notified/pinged.'),
+    '#default_value' => variable_get('fastwebfeed_commentrss_check_crss_feed_admin', ''),
+  );
+  $form['fieldset_fastwebfeed_commentrss']['fieldset_commentrss_what_to_ping']['fieldset_node_types_feed'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('node type feed(s)'),
+    '#description' => t('<em>example: '. l($base_url . $base_path .'crss/node/1', 'crss/node/1', array('attributes' => array('target' => '_blank'))) .'</em>'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  $form['fieldset_fastwebfeed_commentrss']['fieldset_commentrss_what_to_ping']['fieldset_node_types_feed']['fastwebfeed_commentrss_check_node_types_all_admin'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('All node types'),
+    '#description' => t('If checked, the "comment" feeds of "All node types" will be notified/pinged.'),
+    '#default_value' => variable_get('fastwebfeed_commentrss_check_node_types_all_admin', ''),
+  );
+  $form['fieldset_fastwebfeed_commentrss']['fieldset_commentrss_what_to_ping']['fieldset_node_types_feed']['fastwebfeed_commentrss_check_node_types_some_admin'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('One of the following node types'),
+    '#description' => t('If checked, only the "comment" feeds of "One of the following node types" will be notified/pinged.'),
+    '#default_value' => variable_get('fastwebfeed_commentrss_check_node_types_some_admin', ''),
+  );
+  $form['fieldset_fastwebfeed_commentrss']['fieldset_commentrss_what_to_ping']['fieldset_node_types_feed']['fastwebfeed_commentrss_select_node_types_admin'] = array(
+    '#type' => 'select',
+    '#title' => t('Overview of node types'),
+    '#description' => t('Select one of the following node types.<br/>
+    <em style="color:red;">Attention: This effects the update notification of <ul><li>the "crss feed" above.</li><li>the "taxonomy feed(s)" below.</li></ul></em>'),
+    '#default_value' => variable_get('fastwebfeed_commentrss_select_node_types_admin', ''),
+    '#options' => node_get_types('names'),
+    '#multiple' => TRUE,
+  );
+  $form['fieldset_fastwebfeed_commentrss']['fieldset_commentrss_what_to_ping']['fieldset_taxonomy_feed'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('taxonomy feed(s)'),
+    '#description' => t('<em>example: '. l($base_url . $base_path .'crss/term/1', 'crss/term/1', array('attributes' => array('target' => '_blank'))) .'</em>'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  $form['fieldset_fastwebfeed_commentrss']['fieldset_commentrss_what_to_ping']['fieldset_taxonomy_feed']['fastwebfeed_commentrss_check_taxonomy_all_admin'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('All terms'),
+    '#description' => t('If checked, the "comment" feeds of "All terms" will be notified/pinged.'),
+    '#default_value' => variable_get('fastwebfeed_commentrss_check_taxonomy_all_admin', ''),
+  );
+  $form['fieldset_fastwebfeed_commentrss']['fieldset_commentrss_what_to_ping']['fieldset_taxonomy_feed']['fastwebfeed_commentrss_check_taxonomy_some_admin'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('One of the following terms'),
+    '#description' => t('If checked, only the "comment" feeds of "One of the following terms" will be notified/pinged.<br/>'),
+    '#default_value' => variable_get('fastwebfeed_commentrss_check_taxonomy_some_admin', ''),
+  );
+  $form['fieldset_fastwebfeed_commentrss']['fieldset_commentrss_what_to_ping']['fieldset_taxonomy_feed']['fastwebfeed_commentrss_select_taxonomy_admin'] = array(
+    '#type' => 'select',
+    '#title' => t('Overview of terms'),
+    '#description' => t('Select one of the following terms.'),
+    '#default_value' => variable_get('fastwebfeed_commentrss_select_taxonomy_admin', ''),
+    '#options' => taxonomy_form_all(),
+    '#multiple' => TRUE,
+  );
+  return $form;
+}
+
+/**
+ * Menu callback; publish an RSS feed and
+ * extends the comment feeds with the fastwebfeed definitions.
+ * 
+ * @param $type
+ * 		A string indicates the type of a comment feed
+ * @param $value
+ *    A string of an extra argument
+ * @return mixed
+ *    Returns a feed
+ */
+function fastwebfeed_commentrss_handler_commentrss($type = NULL, $value = NULL) {
+  fastwebfeed_ob_start();
+  if (!function_exists('commentrss_handler')) {
+    /** 
+     * including the taxonomy.pages.inc file shouldn't be necessary, because
+     * TaxMan is correctly using hook_menu_alter to change the callback.
+     * but in some combinations with other modules, which overwrite the menu
+     * entry in hook_menu, calling taxonomy_term_page is causing an error. 
+     * the following lines are going to prevent the fatal error
+     */
+    $commentrss_module_path = drupal_get_path('module', 'commentrss');
+    include_once($commentrss_module_path .'/commentrss.pages.inc');
+  }
+  commentrss_handler($type, $value);
+  fastwebfeed_ob_end();
+}
+
+/**
+ * Implementation of the hook_form_comment_form_alter 
+ * It's a hack for $node = node_load(array('nid'=> $a1->nid))
+ * Because isn't possible to load a node in hook_comment on $op == 'insert' 
+ * But we need this revision ID of a node (vid) when we look up the terms of this node
+ * So, the revision ID of a node is invoked in the hook_form_comment_form_alter.
+ */
+function fastwebfeed_commentrss_form_comment_form_alter(&$form, &$form_state) {
+  $node = node_load($form['nid']['#value']);
+  $form['vid'] = array('#type' => 'value', '#value' => $node->vid);
+  $form['type'] = array('#type' => 'value', '#value' => $node->type);
+  $form['node_comment'] = array('#type' => 'value', '#value' => $node->comment);
+}
+
+/**
+ * Implementation of the hook_comment
+ */
+function fastwebfeed_commentrss_comment(&$a1, $op) {
+  $check_ping_on_comment = variable_get('fastwebfeed_commentrss_check_ping_on_comment_submission_admin', '');
+  if ($check_ping_on_comment == 1) {
+    switch ($op) {
+      case 'insert':
+//        $node = node_load(array('nid'=> $a1->nid));
+        /**
+         * It's a hack for $node = node_load(array('nid'=> $a1->nid))
+         * Because isn't possible to load a node in hook_comment on $op == 'insert' 
+         * But we need this revision ID of a node (vid) when we look up the terms of this node
+         * So, the revision ID of a node is invoked in the hook_form_comment_form_alter.
+         */
+        if (empty($node)) {
+          $new_node = array();
+          $node = (object) $new_node;
+          $node->nid = $a1['nid'];
+          $node->vid = $a1['vid'];
+          $node->type = $a1['type'];
+          $node->comment = $a1['node_comment'];
+        }
+        if (module_exists(fastwebfeed_pubsubhubbub) || module_exists(fastwebfeed_sup)) {
+          $feed_urls = fastwebfeed_get_feed_url($node, 'comment');
+          if (module_exists(fastwebfeed_pubsubhubbub)) {
+            if (!fastwebfeed_pubsubhubbub_fastwebfeed_ping($feed_urls)) {
+              drupal_set_message(t("Pubsubhubbub warning: no feed URL's"), 'warning');
+            }
+          }
+          if (module_exists(fastwebfeed_sup)) {
+            if (!fastwebfeed_sup_fastwebfeed_ping($feed_urls)) {
+              drupal_set_message(t("SUP warning: no feed URL's"), 'warning');
+            }
+          }
+          module_invoke_all('fastwebfeed_path', '', 'reset all');
+        }
+      break;
+    }
+  }
+}
+
+/**
+ * Implementation of the hook_fastwebfeed_path()
+ * 
+ * @param $node
+ *   A "node" Object
+ * @param $type
+ *   A string indicates the type of a fastwebfeed path
+ * @return $feed_paths
+ * 	 Returns an array of feed paths
+ * 
+ * @see fastwebfeed.module
+ */
+function fastwebfeed_commentrss_fastwebfeed_path($node, $type) {
+  $feed_paths = array();
+  switch ($type) {
+    case 'reset all':
+      $feed_paths = _fastwebfeed_commentrss_fastwebfeed_path_reset_all();
+    break;
+    case 'all':
+      $feed_paths = _fastwebfeed_commentrss_fastwebfeed_path_all();
+    break;
+    case 'comment':
+      $feed_paths = _fastwebfeed_commentrss_fastwebfeed_path_comment($node);
+    break;
+  }
+  $feed_paths = array_unique($feed_paths);
+  return $feed_paths;
+}
+
+/**
+ * Returns all "comment" fastwebfeed paths to the the hook_fastwebfeed_path()
+ * 
+ * @return $feed_paths
+ * 	Returns an array of feed paths
+ * 
+ * @see fastwebfeed_commentrss_fastwebfeed_path()
+ */
+function _fastwebfeed_commentrss_fastwebfeed_path_all() {
+      $feed_paths = array();
+      $feed_paths = variable_get('fastwebfeed_commentrss_feed_paths', '');
+      if (empty($feed_paths)) {
+        fastwebfeed_commentrss_fastwebfeed_path('', 'reset all');
+        $feed_paths = variable_get('fastwebfeed_commentrss_feed_paths', '');
+      }
+      return $feed_paths;
+}
+
+/**
+ * Resets all "comment" fastwebfeed paths and
+ * returns all "comment" fastwebfeed paths to the the hook_fastwebfeed_path()
+ * 
+ * @return $feed_paths
+ * 	Returns an array of feed paths
+ * 
+ * @see fastwebfeed_commentrss_fastwebfeed_path()
+ */
+function _fastwebfeed_commentrss_fastwebfeed_path_reset_all() {
+      $feed_paths = array();
+      $feed_paths_ = array();
+      $node = array();
+      $result = db_query('SELECT n.nid, n.vid, n.type, n.comment FROM {node} n');
+      while ($node = db_fetch_object($result)) {
+        $feed_paths_ = _fastwebfeed_commentrss_fastwebfeed_path_comment($node);
+        foreach ($feed_paths_ as $feed_path_) {
+          $feed_paths[] = $feed_path_;
+        }
+      }
+      $feed_paths = array_unique($feed_paths);
+      variable_set('fastwebfeed_commentrss_feed_paths', $feed_paths);
+      return $feed_paths;
+}
+
+/**
+ * Returns specific "comment" fastwebfeed paths to the the hook_fastwebfeed_path()
+ * 
+ * @return $feed_paths
+ * 	Returns an array of feed paths
+ * 
+ * @see fastwebfeed_commentrss_fastwebfeed_path()
+ */
+function _fastwebfeed_commentrss_fastwebfeed_path_comment($node) {
+  $feed_paths = array();
+  $check_ping_on_comment = variable_get('fastwebfeed_commentrss_check_ping_on_comment_submission_admin', '');
+  $check_node_types_all = variable_get('fastwebfeed_commentrss_check_node_types_all_admin', '');
+  $check_node_types_some = variable_get('fastwebfeed_commentrss_check_node_types_some_admin', '');
+  $check_taxonomy_all = variable_get('fastwebfeed_commentrss_check_taxonomy_all_admin', '');
+  $check_taxonomy_some = variable_get('fastwebfeed_commentrss_check_taxonomy_some_admin', '');
+  $check_crss_feed = variable_get('fastwebfeed_commentrss_check_crss_feed_admin', '');
+//  echo '<pre>'.print_r($node,true).'</pre>';
+  if ($check_ping_on_comment == 1 && (int)$node->comment > 0) {
+    if ($check_crss_feed == 1) {
+      if ($check_node_types_all == 1) {
+        $feed_paths[] = 'crss';
+      }
+      elseif ($check_node_types_some == 1) {
+        $select_node_types = variable_get('fastwebfeed_commentrss_select_node_types_admin', '');
+        foreach ($select_node_types as $key_select_node_type => $value_select_node_type) {
+          if ($node->type == $key_select_node_type) {
+            $feed_paths[] = 'crss';
+          }
+        }
+      }
+    }
+    if ($check_node_types_all == 1 || $check_node_types_some == 1 || $check_taxonomy_all == 1 || $check_taxonomy_some == 1) {
+      if ($check_node_types_all == 1) {
+        $feed_paths[] = 'crss/node/'. $node->nid;
+      }
+      elseif ($check_node_types_some == 1) {
+        $select_node_types = variable_get('fastwebfeed_commentrss_select_node_types_admin', '');
+        foreach ($select_node_types as $key_select_node_type => $value_select_node_type) {
+          if ($node->type == $key_select_node_type) {
+            $feed_paths[] = 'crss/node/'. $node->nid;
+          }
+        }
+      }
+      if ($check_taxonomy_all == 1 || $check_taxonomy_some == 1) {
+        $terms = taxonomy_node_get_terms($node);
+        if ($check_taxonomy_all == 1) {
+          foreach ($terms as $key_term => $value_term) {
+            if ($check_node_types_all == 1) {
+              $feed_paths[] = 'crss/term/'. $value_term->tid;
+            }
+            elseif ($check_node_types_some == 1) {
+              $select_node_types = variable_get('fastwebfeed_commentrss_select_node_types_admin', '');
+              foreach ($select_node_types as $key_select_node_type => $value_select_node_type) {
+                if ($node->type == $key_select_node_type) {
+                  $feed_paths[] = 'crss/term/'. $value_term->tid;
+                }
+              }
+            }
+          }
+        }
+        elseif ($check_taxonomy_some == 1) {
+          $select_terms = variable_get('fastwebfeed_commentrss_select_taxonomy_admin', '');
+          foreach ($select_terms as $key_select_term => $value_select_term) {
+            foreach ($terms as $key_term => $value_term) {
+              if ($value_term->tid == $key_select_term) {
+                if ($check_node_types_all == 1) {
+                  $feed_paths[] = 'crss/term/'. $value_term->tid;
+                }
+                elseif ($check_node_types_some == 1) {
+                  $select_node_types = variable_get('fastwebfeed_commentrss_select_node_types_admin', '');
+                  foreach ($select_node_types as $key_select_node_type => $value_select_node_type) {
+                    if ($node->type == $key_select_node_type) {
+                      $feed_paths[] = 'crss/term/'. $value_term->tid;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return $feed_paths;
+}

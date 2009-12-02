@@ -1,0 +1,109 @@
+<?php
+// $Id$
+/**
+ * @file
+ * Tests for Fastwebfeed SimpleUpdateProtocol (SUP) module.
+ *
+ * Copyright 2009 by Jo Bollen ("JoBo", http://drupal.org/user/111415 )
+ */
+
+class FwfSUPTestCase extends DrupalWebTestCase {
+  /**
+   * Implementation of getInfo().
+   */
+  public static function getInfo() {
+    return array(
+      'name' => t('SimpleUpdateProtocol (SUP)'),
+      'description' => t('<ol><li>Edit/add/delete a SimpleUpdateProtocol (SUP) definition</li><li>Edit/add/delete the LINK-attributes of a SimpleUpdateProtocol (SUP) definition</li><li>Configure Fastwebfeed settings</li><li>Create a node (promoted to the front/rss.xml)</li><li>Verify link-attributes in rss.xml</li></ol>'),
+      'group' => t('Fastwebfeed'),
+    );
+  }
+
+  /**
+   * Implementation of setUp().
+   */
+  function setUp() {
+    parent::setUp('fastwebfeed', 'fastwebfeed_sup');
+
+    // Create and login user
+    $admin_user = $this->drupalCreateUser(array('administer nodes', 'administer fastwebfeed', 'access site reports'));
+    $this->drupalLogin($admin_user);
+    // Init settings
+    variable_set('fastwebfeed_sup_check_sup_service_admin', '');
+    variable_set('fastwebfeed_sup_select_sup_service_admin', array(''));
+  }
+  
+  /**
+   * Test Fastwebfeed SimpleUpdateProtocol (SUP).
+   */
+  function testFwfSUP() {
+    $edit = array();
+    // Edit a SimpleUpdateProtocol (SUP) definition admin/settings/fastwebfeed/sup
+    $edit['row_sup_service_name_1_1'] = 'TEST friendfeed_public';
+    $edit['row_sup_service_name_desc_1_1'] = 'TEST friendfeed public';
+    // Add a SimpleUpdateProtocol (SUP) definition admin/settings/fastwebfeed/sup
+    $edit['sup_service_status_admin'] = '1';
+    $edit['sup_service_name_admin'] = 'TEST TWO friendfeed_public';
+    $edit['sup_service_name_desc_admin'] = 'TEST TWO friendfeed public';
+    $edit['sup_service_ping_url_admin'] = 'http://friendfeed.com/api/public-sup-ping?url=%FEED_URL%&supid=%SUPID%';
+    $edit['sup_service_url_admin'] = 'http://friendfeed.com/api/public-sup.json#%SUPID%';
+    $edit['sup_service_supid_length_admin'] = '10';
+    $this->drupalPost('admin/settings/fastwebfeed/sup', $edit, t('Save'));
+    $this->assertText(t('The "Fastwebfeed" configuration have been saved.'), t('Config SimpleUpdateProtocol (SUP) definitions successfully saved. (edit/save)'));
+    
+    $edit = array();
+    // Delete a SimpleUpdateProtocol (SUP) definition admin/settings/fastwebfeed/sup
+    $edit['row_sup_service_delete_2_2'] = '1';
+    $this->drupalPost('admin/settings/fastwebfeed/sup', $edit, t('Save'));
+    $this->assertText(t('The "Fastwebfeed" configuration have been saved.'), t('Config of the SimpleUpdateProtocol (SUP) definitions successfully saved. (delete)'));
+    
+    $edit = array();
+    // Edit the LINK-attributes of a SimpleUpdateProtocol (SUP) definition admin/settings/fastwebfeed/sup/service/link/1
+    $edit['row_sup_service_link_attr_key_3_3'] = 'TEST type';
+    // Add the LINK-attributes of a SimpleUpdateProtocol (SUP) definition admin/settings/fastwebfeed/sup/service/link/1
+    $edit['sup_service_link_status_admin'] = '1';
+    $edit['sup_service_link_sup_service_id_admin'] = '1';
+    $edit['sup_service_link_attr_key_admin'] = 'type';
+    $edit['sup_service_link_attr_value_admin'] = 'application/json';
+    $this->drupalPost('admin/settings/fastwebfeed/sup/service/link/1', $edit, t('Save'));
+    $this->assertText(t('The "Fastwebfeed" configuration have been saved.'), t('Config of the LINK-attributes successfully saved. (edit/add)'));
+    
+    $edit = array();
+    // Delete the LINK-attributes of a SimpleUpdateProtocol (SUP) definition admin/settings/fastwebfeed/sup/service/link/1
+    $edit['row_sup_service_link_delete_3_3'] = '1';
+    $this->drupalPost('admin/settings/fastwebfeed/sup/service/link/1', $edit, t('Save'));
+    $this->assertText(t('The "Fastwebfeed" configuration have been saved.'), t('Config of the LINK-attributes successfully saved. (delete)'));
+    
+    // config Fastwebfeed "settings" admin page admin/settings/fastwebfeed/settings
+    $edit = array();
+    $edit['fastwebfeed_sup_check_sup_service_admin'] = 1;
+    $select = "fastwebfeed_sup_select_sup_service_admin[]";
+    $edit[$select]= array('1');
+    $this->drupalPost('admin/settings/fastwebfeed/settings', $edit, t('Save configuration'));
+    $this->assertText(t('The configuration options have been saved.'), t('Configs Fastwebfeed "Settings" successfully saved.'));
+    
+    // Add a new page by filling out the input form on the node/add/page.
+    $edit = array();
+    $edit['title'] = $this->randomName(8);
+    $edit['body'] = $this->randomName(32);
+    $edit['promote'] = 1;
+    $this->drupalPost('node/add/page', $edit, t('Save'));
+    $this->assertText(t('Page @title has been created.', array('@title' => $edit['title'])), t('Page successfully created.'));
+    
+    // verify link-attributes in rss.xml
+    $this->drupalGet('rss.xml');
+    $this->assertPattern('@<atom:link rel="http://api.friendfeed.com/2008/03#sup".*type="application/json" />.*@s', t('SimpleUpdateProtocol (SUP) link-attributes in the "rss.xml"-feed found.'));
+    $this->outputScreenContents('show RSS.xml', 'testFastwebfeed');
+  }
+
+  private function outputScreenContents($description, $basename) {
+    // This is a hack to get a directory that won't be cleaned up by simpletest
+    $file_dir = file_directory_path() .'/../simpletest_output_pages';
+    if (!is_dir($file_dir)) {
+      mkdir($file_dir, 0777, TRUE);
+    }
+    $output_path = "$file_dir/$basename." . $this->randomName(10) .'.html';
+    $rv = file_put_contents($output_path, $this->drupalGetContent());
+    $this->pass($description .": Contents of result page are ". l('here', $output_path, array('attributes' => array('target' => '_blank'))) );
+  }
+}

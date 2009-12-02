@@ -1,0 +1,15 @@
+// $Id$
+
+Fastwebfeed CommentRSS x.x-x.x, xxxx-xx-xx
+------------------------------------------
+
+Fastwebfeed CommentRSS 6.x-1.0-beta2, 2009-11-21
+------------------------------------------------
+* invokes the fastwebfeed definitions with the fastwebfeed_commentrss.module and inject these into commentrss.module.
+
+Fastwebfeed CommentRSS 6.x-1.0-RC1, 2009-11-30
+----------------------------------------------
+* change the UI admin page
+* add hook_sfastwebfeed_plugged_modules_admin()
+* add hook_fastwebfeed_description()
+* add Simple tests
