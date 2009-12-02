@@ -1,6 +1,0 @@
-; $Id$
-name = Fastwebfeed
-description = The fastwebfeed module provides a XML based document with frequently updated content
-package = fastwebfeed
-core = 6.x
-version = "6.x-1.0-RC1"
