@@ -1,0 +1,247 @@
+<?php
+// $Id$
+/**
+ * @file
+ * Tests for Fastwebfeed Taxonomy module.
+ *
+ * Copyright 2009 by Jo Bollen ("JoBo", http://drupal.org/user/111415 )
+ */
+
+class FwfTaxonomyTestCase extends DrupalWebTestCase {
+  /**
+   * Implementation of getInfo().
+   */
+  public static function getInfo() {
+    return array(
+      'name' => t('Fastwebfeed Taxonomy'),
+      'description' => t('<ol>
+      <li>FwfTaxonomyAllNodeTypesAllTerms()<ol>
+      <li>Configure the Fastwebfeed "Plugged Module" page
+       <ol><li>ping on "node" submission</li><li>for all node types</li><li>for all terms</li></ol>
+      </li>
+			<li>Create a node "page" (promoted to the front/rss.xml)</li>
+			<li>Check watchdog logging </li>
+			<li>Verify in taxonomy/term/?/0/feed (?=term-id)</li>
+			<li>Create a node "story" (promoted to the front/rss.xml)</li>
+			<li>Check watchdog logging </li>
+			<li>Verify in taxonomy/term/?/0/feed (?=term-id)</li>
+			<li>Verify Fastwebfeed info</li></ol></li>
+			<li>FwfTaxonomySomeNodeTypesSomeTerms()<ol>
+      <li>Configure the Fastwebfeed "Plugged Module" page
+       <ol><li>ping on "node" submission</li><li>Only the "page" node type</li><li>Only the term with id "1"</li></ol>
+      </li>
+			<li>Create a node "page" (promoted to the front/rss.xml)</li>
+			<li>Check watchdog logging </li>
+			<li>Verify in taxonomy/term/?/0/feed (?=term-id)</li>
+			<li>Create a node "story" (promoted to the front/rss.xml)</li>
+			<li>Check watchdog logging </li>
+			<li>Verify in taxonomy/term/?/0/feed (?=term-id)</li>
+			<li>Verify Fastwebfeed info</li></ol></li></ol>'),
+      'group' => t('Fastwebfeed'),
+    );
+  }
+
+  /**
+   * Implementation of setUp().
+   */
+  function setUp() {
+    parent::setUp('fastwebfeed', 'fastwebfeed_sup', 'fastwebfeed_pubsubhubbub', 'fastwebfeed_taxonomy', 'devel', 'taxonomy');
+
+    // Create and login user
+    $admin_user = $this->drupalCreateUser(array('administer nodes', 'administer fastwebfeed', 'access site reports' , 'administer taxonomy'));
+    $this->drupalLogin($admin_user);
+    // init settings
+    variable_set('fastwebfeed_check_ping_on_node_submission_admin', '');
+    variable_set('fastwebfeed_check_node_types_all_admin', '');
+    variable_set('fastwebfeed_taxonomy_check_ping_on_node_submission_admin', '');
+    variable_set('fastwebfeed_taxonomy_check_node_types_all_admin', '');
+    variable_set('fastwebfeed_taxonomy_check_taxonomy_all_admin', '');
+    // Activate the watchdog logging in the Fastwebfeed "settings" page admin/settings/fastwebfeed/settings
+    variable_set('fastwebfeed_check_watchdog_log_admin', '1');
+    // generate voc and terms
+    if (!function_exists('devel_generate_taxonomy_data')) {
+      $devel_module_path = drupal_get_path('module', 'devel');
+      include_once($devel_module_path .'/devel_generate.inc');
+    }
+    devel_generate_taxonomy_data(1, 3, 6, FALSE);
+    $edit = array();
+    $edit["nodes[page]"] = 'page';
+    $edit["nodes[story]"] = 'story';
+    $this->drupalPost('admin/content/taxonomy/edit/vocabulary/1', $edit, t('Save'));
+  }
+
+  /**
+   * Test Fastwebfeed. The selected hubs/services will be notified when the rss.xml is updated.
+   * When to ping (or notify)? On "node" submission.
+   * What to ping (or notify)?
+   *   Taxonomy feeds:
+   *     - All node types
+   *     - All terms
+   */
+  function testFwfTaxonomyAllNodeTypesAllTerms() {
+    // Configure the Fastwebfeed "Plugged Module" page admin/settings/fastwebfeed/plugged_modules
+    // ping on "node" submission
+    // for all node type
+    // for all terms
+    $edit = array();
+    $edit['fastwebfeed_taxonomy_check_ping_on_node_submission_admin'] = 1;
+    $edit['fastwebfeed_taxonomy_check_node_types_all_admin'] = 1;
+    $edit['fastwebfeed_taxonomy_check_taxonomy_all_admin'] = 1;
+    $this->drupalPost('admin/settings/fastwebfeed/plugged_modules', $edit, t('Save configuration'));
+    $this->assertText(t('The configuration options have been saved.'), t('Configs Fastwebfeed "Plugged module" successfully saved.'));
+
+    // Add a new page by filling out the input form on the node/add/page.
+    $edit = array();
+    $edit['title'] = $this->randomName(8);
+    $edit['body'] = $this->randomName(32);
+    $edit["taxonomy[1][]"] = array('1', '2');
+    $edit['promote'] = 1;
+    $this->drupalPost('node/add/page', $edit, t('Save'));
+    $this->assertText(t('Page @title has been created.', array('@title' => $edit['title'])), t('Page successfully created.'));
+
+    // check watchdog logging
+    // ping on "node" submission
+    // for all node type
+    $this->drupalGet('admin/reports/dblog');
+    $result = db_query("SELECT * FROM {watchdog} w where w.type like '%s' ORDER BY w.wid ASC", '%fastwebfeed%');
+    while ($watchdog = db_fetch_object($result)) {
+      $this->drupalGet('admin/reports/event/'. $watchdog->wid);
+      $last_wid = $watchdog->wid;
+    }
+
+    // verify in "taxonomy" feed for node 1
+    $terms = taxonomy_node_get_terms(node_load(1));
+    foreach ($terms as $term) {
+      $this->drupalGet('taxonomy/term/'. $term->tid .'/0/feed');
+      $this->outputScreenContents('show taxonomy/term/'. $term->tid .'/0/feed', 'testFastwebfeed');
+    }
+
+    // Add a new story by filling out the input form on the node/add/page.
+    $edit = array();
+    $edit['title'] = $this->randomName(8);
+    $edit['body'] = $this->randomName(32);
+    $edit["taxonomy[1][]"] = array('1', '3');
+    $edit['promote'] = 1;
+    $this->drupalPost('node/add/story', $edit, t('Save'));
+    $this->assertText(t('Story @title has been created.', array('@title' => $edit['title'])), t('Story successfully created.'));
+
+    // check watchdog logging
+    // ping on "node" submission
+    // for all node type
+    // for all terms
+    $this->drupalGet('admin/reports/dblog');
+    $result = db_query("SELECT * FROM {watchdog} w where w.type like '%s' AND w.wid > %d ORDER BY w.wid ASC", '%fastwebfeed%', $last_wid);
+    while ($watchdog = db_fetch_object($result)) {
+      $this->drupalGet('admin/reports/event/'. $watchdog->wid);
+      $last_wid = $watchdog->wid;
+    }
+
+    // verify in "taxonomy" feed for node 2
+    $terms = taxonomy_node_get_terms(node_load(2));
+    foreach ($terms as $term) {
+      $this->drupalGet('taxonomy/term/'. $term->tid .'/0/feed');
+      $this->outputScreenContents('show taxonomy/term/'. $term->tid .'/0/feed', 'testFastwebfeed');
+    }
+
+    // verify Fastwebfeed info
+    $this->drupalGet('admin/settings/fastwebfeed/info');
+  }
+
+  /**
+   * Test Fastwebfeed. The selected hubs/services will be notified when the rss.xml is updated.
+   * When to ping (or notify)? On "node" submission.
+   * What to ping (or notify)?
+   *   Taxonomy feeds:
+   *     - Only the "page" node type
+   *     - Only the term with id "1"
+   */
+  function testFwfTaxonomySomeNodeTypesSomeTerms() {
+    // Configure the Fastwebfeed "Plugged Module" page admin/settings/fastwebfeed/plugged_modules
+    // ping on "node" submission
+    // for node type 'page'
+    // for term id '1'
+    $edit = array();
+    $edit['fastwebfeed_taxonomy_check_ping_on_node_submission_admin'] = 1;
+    $edit['fastwebfeed_taxonomy_check_node_types_all_admin'] = FALSE;
+    $edit['fastwebfeed_taxonomy_check_node_types_some_admin'] = 1;
+    $select = "fastwebfeed_taxonomy_select_node_types_admin[]";
+    $edit[$select]= array('page');
+    $edit['fastwebfeed_taxonomy_check_taxonomy_all_admin'] = FALSE;
+    $edit['fastwebfeed_taxonomy_check_taxonomy_some_admin'] = 1;
+    $select = "fastwebfeed_taxonomy_select_taxonomy_admin[]";
+    $edit[$select]= array('1');
+    $this->drupalPost('admin/settings/fastwebfeed/plugged_modules', $edit, t('Save configuration'));
+    $this->assertText(t('The configuration options have been saved.'), t('Configs Fastwebfeed "Plugged module" successfully saved.'));
+
+    // Add a new page by filling out the input form on the node/add/page.
+      // Add a new page by filling out the input form on the node/add/page.
+    $edit = array();
+    $terms_ = array();
+    $edit['title'] = $this->randomName(8);
+    $edit['body'] = $this->randomName(32);
+    $edit["taxonomy[1][]"] = array('1', '2');
+    $edit['promote'] = 1;
+    $this->drupalPost('node/add/page', $edit, t('Save'));
+    $this->assertText(t('Page @title has been created.', array('@title' => $edit['title'])), t('Page successfully created.'));
+
+    // check watchdog logging
+    // ping on "node" submission
+    // for node type 'page'
+    // for term id '1'
+    $this->drupalGet('admin/reports/dblog');
+    $result = db_query("SELECT * FROM {watchdog} w where w.type like '%s' ORDER BY w.wid ASC", '%fastwebfeed%');
+    while ($watchdog = db_fetch_object($result)) {
+      $this->drupalGet('admin/reports/event/'. $watchdog->wid);
+      $last_wid = $watchdog->wid;
+    }
+
+    // verify in "taxonomy" feed for node 1
+    $terms = taxonomy_node_get_terms(node_load(1));
+    foreach ($terms as $term) {
+      $this->drupalGet('taxonomy/term/'. $term->tid .'/0/feed');
+      $this->outputScreenContents('show taxonomy/term/'. $term->tid .'/0/feed', 'testFastwebfeed');
+    }
+
+    // Add a new story by filling out the input form on the node/add/page.
+    $edit = array();
+    $terms_ = array();
+    $edit['title'] = $this->randomName(8);
+    $edit['body'] = $this->randomName(32);
+    $edit["taxonomy[1][]"] = array('1', '3');
+    $edit['promote'] = 1;
+    $this->drupalPost('node/add/story', $edit, t('Save'));
+    $this->assertText(t('Story @title has been created.', array('@title' => $edit['title'])), t('Story successfully created.'));
+
+    // check watchdog logging
+    // ping on "node" submission
+    // for node type 'page'
+    // for term id '1'
+    $this->drupalGet('admin/reports/dblog');
+    $result = db_query("SELECT * FROM {watchdog} w where w.type like '%s' AND w.wid > %d ORDER BY w.wid ASC", '%fastwebfeed%', $last_wid);
+    while ($watchdog = db_fetch_object($result)) {
+      $this->drupalGet('admin/reports/event/'. $watchdog->wid);
+      $last_wid = $watchdog->wid;
+    }
+
+    // verify in "taxonomy" feed for node 2
+    $terms = taxonomy_node_get_terms(node_load(2));
+    foreach ($terms as $term) {
+      $this->drupalGet('taxonomy/term/'. $term->tid .'/0/feed');
+      $this->outputScreenContents('show taxonomy/term/'. $term->tid .'/0/feed', 'testFastwebfeed');
+    }
+
+    // verify Fastwebfeed info
+    $this->drupalGet('admin/settings/fastwebfeed/info');
+  }
+
+  private function outputScreenContents($description, $basename) {
+    // This is a hack to get a directory that won't be cleaned up by simpletest
+    $file_dir = file_directory_path() .'/../simpletest_output_pages';
+    if (!is_dir($file_dir)) {
+      mkdir($file_dir, 0777, TRUE);
+    }
+    $output_path = "$file_dir/$basename." . $this->randomName(10) .'.html';
+    $rv = file_put_contents($output_path, $this->drupalGetContent());
+    $this->pass($description .": Contents of result page are ". l('here', $output_path, array('attributes' => array('target' => '_blank'))) );
+  }
+}

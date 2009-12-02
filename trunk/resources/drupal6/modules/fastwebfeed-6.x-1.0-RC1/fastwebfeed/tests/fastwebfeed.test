@@ -1,0 +1,192 @@
+<?php
+// $Id$
+/**
+ * @file
+ * Tests for Fastwebfeed module.
+ *
+ * Copyright 2009 by Jo Bollen ("JoBo", http://drupal.org/user/111415 )
+ */
+
+class FwfTestCase extends DrupalWebTestCase {
+  /**
+   * Implementation of getInfo().
+   */
+  public static function getInfo() {
+    return array(
+      'name' => t('Fastwebfeed'),
+      'description' => t('<ol>
+      <li>FwfAllNodeTypes()<ol>
+      <li>Configure the Fastwebfeed "Plugged Module" page
+       <ol><li>ping on "node" submission</li><li>for all node types</li></ol>
+      </li>
+			<li>Create a node "page" (promoted to the front/rss.xml)</li>
+			<li>Check watchdog logging </li>
+			<li>Create a node "story" (promoted to the front/rss.xml)</li>
+			<li>Check watchdog logging </li>
+			<li>Verify in rss.xml</li>
+			<li>Verify Fastwebfeed info</li></ol></li>
+			<li>FwfSomeNodeTypes()<ol>
+      <li>Configure the Fastwebfeed "Plugged Module" page
+       <ol><li>ping on "node" submission</li><li>only the "page" node type</li></ol>
+      </li>
+			<li>Create a node "page" (promoted to the front/rss.xml)</li>
+			<li>Check watchdog logging </li>
+			<li>Create a node "story" (promoted to the front/rss.xml)</li>
+			<li>Check watchdog logging </li>
+			<li>Verify in rss.xml</li>
+			<li>Verify Fastwebfeed info</li></ol></li></ol>'),
+      'group' => t('Fastwebfeed'),
+    );
+  }
+
+  /**
+   * Implementation of setUp().
+   */
+  function setUp() {
+    parent::setUp('fastwebfeed', 'fastwebfeed_sup', 'fastwebfeed_pubsubhubbub');
+
+    // Create and login user
+    $admin_user = $this->drupalCreateUser(array('administer nodes', 'administer fastwebfeed', 'access site reports'));
+    $this->drupalLogin($admin_user);
+    // Init settings
+    variable_set('fastwebfeed_check_ping_on_node_submission_admin', '');
+    variable_set('fastwebfeed_check_node_types_all_admin', '');
+    // Activate the watchdog logging in the Fastwebfeed "settings" page admin/settings/fastwebfeed/settings
+    $edit = array();
+    $edit['fastwebfeed_check_watchdog_log_admin'] = 1;
+    $this->drupalPost('admin/settings/fastwebfeed/settings', $edit, t('Save configuration'));
+    $this->assertText(t('The configuration options have been saved.'), t('Configs Fastwebfeed "Settings" successfully saved. (activate watchdog logging)'));
+  }
+
+  /**
+   * Test Fastwebfeed. The selected hubs/services will be notified when the rss.xml is updated.
+   * When to ping (or notify)? On "node" submission.
+   * What to ping (or notify)? rss.xml - All node types.
+   */
+  function testFwfAllNodeTypes() {
+    // Configure the Fastwebfeed "Plugged Module" page admin/settings/fastwebfeed/plugged_modules
+    // ping on "node" submission
+    // for all node type
+    $edit = array();
+    $edit['fastwebfeed_check_ping_on_node_submission_admin'] = 1;
+    $edit['fastwebfeed_check_node_types_all_admin'] = 1;
+    $this->drupalPost('admin/settings/fastwebfeed/plugged_modules', $edit, t('Save configuration'));
+    $this->assertText(t('The configuration options have been saved.'), t('Configs Fastwebfeed "Plugged module" successfully saved.'));
+
+    // Add a new page by filling out the input form on the node/add/page.
+    $edit = array();
+    $edit['title'] = $this->randomName(8);
+    $edit['body'] = $this->randomName(32);
+    $edit['promote'] = 1;
+    $this->drupalPost('node/add/page', $edit, t('Save'));
+    $this->assertText(t('Page @title has been created.', array('@title' => $edit['title'])), t('Page successfully created.'));
+
+    // check watchdog logging
+    // ping on "node" submission
+    // for all node type
+    $this->drupalGet('admin/reports/dblog');
+    $result = db_query("SELECT * FROM {watchdog} w where w.type like '%s' ORDER BY w.wid ASC", '%fastwebfeed%');
+    while ($watchdog = db_fetch_object($result)) {
+      $this->drupalGet('admin/reports/event/'. $watchdog->wid);
+      $last_wid = $watchdog->wid;
+    }
+
+    // Add a new story by filling out the input form on the node/add/page.
+    $edit = array();
+    $edit['title'] = $this->randomName(8);
+    $edit['body'] = $this->randomName(32);
+    $edit['promote'] = 1;
+    $this->drupalPost('node/add/story', $edit, t('Save'));
+    $this->assertText(t('Story @title has been created.', array('@title' => $edit['title'])), t('Story successfully created.'));
+
+    // check watchdog logging
+    // ping on "node" submission
+    // for all node type
+    $this->drupalGet('admin/reports/dblog');
+    $result = db_query("SELECT * FROM {watchdog} w where w.type like '%s' AND w.wid > %d ORDER BY w.wid ASC", '%fastwebfeed%', $last_wid);
+    while ($watchdog = db_fetch_object($result)) {
+      $this->drupalGet('admin/reports/event/'. $watchdog->wid);
+      $last_wid = $watchdog->wid;
+    }
+
+    // verify in rss.xml
+    $this->drupalGet('rss.xml');
+    $this->outputScreenContents('show RSS.xml', 'testFastwebfeed');
+
+    // verify Fastwebfeed info
+    $this->drupalGet('admin/settings/fastwebfeed/info');
+  }
+
+  /**
+   * Test Fastwebfeed. The selected hubs/services will be notified when the rss.xml is updated.
+   * When to ping (or notify)? On "node" submission.
+   * What to ping (or notify)? rss.xml - One of the following node types - 'page'.
+   */
+  function testFwfSomeNodeTypes() {
+    // Configure the Fastwebfeed "Plugged Module" page admin/settings/fastwebfeed/plugged_modules
+    // ping on "node" submission
+    // for node type 'page'
+    $edit = array();
+    $edit['fastwebfeed_check_ping_on_node_submission_admin'] = 1;
+    $edit['fastwebfeed_check_node_types_all_admin'] = FALSE;
+    $edit['fastwebfeed_check_node_types_some_admin'] = 1;
+    $select = "fastwebfeed_select_node_types_admin[]";
+    $edit[$select]= array('page');
+    $this->drupalPost('admin/settings/fastwebfeed/plugged_modules', $edit, t('Save configuration'));
+    $this->assertText(t('The configuration options have been saved.'), t('Configs Fastwebfeed "Plugged module" successfully saved.'));
+
+    // Add a new page by filling out the input form on the node/add/page.
+    $edit = array();
+    $edit['title'] = $this->randomName(8);
+    $edit['body'] = $this->randomName(32);
+    $edit['promote'] = 1;
+    $this->drupalPost('node/add/page', $edit, t('Save'));
+    $this->assertText(t('Page @title has been created.', array('@title' => $edit['title'])), t('Page successfully created.'));
+
+    // check watchdog logging
+    // ping on "node" submission
+    // for all node type
+    $this->drupalGet('admin/reports/dblog');
+    $result = db_query("SELECT * FROM {watchdog} w where w.type like '%s' ORDER BY w.wid ASC", '%fastwebfeed%');
+    while ($watchdog = db_fetch_object($result)) {
+      $this->drupalGet('admin/reports/event/'. $watchdog->wid);
+      $last_wid = $watchdog->wid;
+    }
+
+    // Add a new story by filling out the input form on the node/add/page.
+    $edit = array();
+    $edit['title'] = $this->randomName(8);
+    $edit['body'] = $this->randomName(32);
+    $edit['promote'] = 1;
+    $this->drupalPost('node/add/story', $edit, t('Save'));
+    $this->assertText(t('Story @title has been created.', array('@title' => $edit['title'])), t('Story successfully created.'));
+
+    // check watchdog logging
+    // ping on "node" submission
+    // for all node type
+    $this->drupalGet('admin/reports/dblog');
+    $result = db_query("SELECT * FROM {watchdog} w where w.type like '%s' AND w.wid > %d ORDER BY w.wid ASC", '%fastwebfeed%', $last_wid);
+    while ($watchdog = db_fetch_object($result)) {
+      $this->drupalGet('admin/reports/event/'. $watchdog->wid);
+      $last_wid = $watchdog->wid;
+    }
+
+    // verify in rss.xml
+    $this->drupalGet('rss.xml');
+    $this->outputScreenContents('show RSS.xml', 'testFastwebfeed');
+
+    // verify Fastwebfeed info
+    $this->drupalGet('admin/settings/fastwebfeed/info');
+  }
+
+  private function outputScreenContents($description, $basename) {
+    // This is a hack to get a directory that won't be cleaned up by simpletest
+    $file_dir = file_directory_path() .'/../simpletest_output_pages';
+    if (!is_dir($file_dir)) {
+      mkdir($file_dir, 0777, TRUE);
+    }
+    $output_path = "$file_dir/$basename." . $this->randomName(10) .'.html';
+    $rv = file_put_contents($output_path, $this->drupalGetContent());
+    $this->pass($description .": Contents of result page are ". l('here', $output_path, array('attributes' => array('target' => '_blank'))) );
+  }
+}

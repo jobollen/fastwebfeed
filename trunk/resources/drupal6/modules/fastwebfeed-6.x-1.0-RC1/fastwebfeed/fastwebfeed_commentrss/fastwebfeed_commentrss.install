@@ -1,0 +1,42 @@
+<?php
+// $Id$
+/**
+ * @file
+ * fastwebfeed_commentrss.install
+ * 
+ * This a ".install"-file. 
+ * 
+ * @author Jo Bollen <fastwebfeed@gmail.com>
+ * @site http://cupid-project.be/project/fastwebfeed-module
+ * @filesource
+ */
+
+ /**
+ * Implementation of hook_install().
+ */
+function fastwebfeed_commentrss_install() {
+  drupal_set_message(t('Installation of the fastwebfeed_commentrss.module started.'));
+  // admin settings
+  variable_set('fastwebfeed_commentrss_check_ping_on_comment_submission_admin', '1');
+  variable_set('fastwebfeed_commentrss_check_crss_feed_admin', '1');
+  variable_set('fastwebfeed_commentrss_check_node_types_all_admin', '1');
+  variable_set('fastwebfeed_commentrss_check_taxonomy_all_admin', '1');
+  // system weight of the module
+  db_query("UPDATE {system} SET weight = 15 WHERE name = 'fastwebfeed_taxonomy'");
+  drupal_set_message(t('Installation of the fastwebfeed_commentrss.module completed.'));
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function fastwebfeed_commentrss_uninstall() {
+  variable_del('fastwebfeed_commentrss_check_ping_on_comment_submission_admin');
+  variable_del('fastwebfeed_commentrss_check_crss_feed_admin');
+  variable_del('fastwebfeed_commentrss_check_node_types_all_admin');
+  variable_del('fastwebfeed_commentrss_check_node_types_some_admin');
+  variable_del('fastwebfeed_commentrss_select_node_types_admin');
+  variable_del('fastwebfeed_commentrss_check_taxonomy_all_admin');
+  variable_del('fastwebfeed_commentrss_check_taxonomy_some_admin');
+  variable_del('fastwebfeed_commentrss_select_taxonomy_admin');
+  variable_del('fastwebfeed_commentrss_feed_paths');
+}
