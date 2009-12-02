@@ -1,8 +1,0 @@
-; $Id$
-name = Fastwebfeed (aggregator.module)
-description = Module to invoke the fastwebfeed with the "aggregator" RSS feeds
-package = fastwebfeed
-dependencies[] = fastwebfeed
-dependencies[] = aggregator
-core = 6.x
-version = "6.x-1.0-RC1"

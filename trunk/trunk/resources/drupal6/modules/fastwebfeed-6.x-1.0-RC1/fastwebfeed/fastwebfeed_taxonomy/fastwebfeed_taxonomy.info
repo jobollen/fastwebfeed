@@ -1,8 +1,0 @@
-; $Id$
-name = Fastwebfeed (taxonomy.module)
-description = Module to invoke the fastwebfeed with the "taxonomy" RSS feeds
-package = fastwebfeed
-dependencies[] = fastwebfeed
-dependencies[] = taxonomy
-core = 6.x
-version = "6.x-1.0-RC1"
