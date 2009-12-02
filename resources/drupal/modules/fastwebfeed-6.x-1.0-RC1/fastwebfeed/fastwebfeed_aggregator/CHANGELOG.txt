@@ -1,0 +1,11 @@
+// $Id$
+
+Fastwebfeed Aggregator x.x-x.x, xxxx-xx-xx
+------------------------------------------
+
+Fastwebfeed Aggregator 6.x-1.0-RC1, 2009-11-30
+----------------------------------------------
+* invokes the fastwebfeed definitions with the fastwebfeed_aggregator.module and inject these into aggregator.module.
+* add Simple tests
+
+

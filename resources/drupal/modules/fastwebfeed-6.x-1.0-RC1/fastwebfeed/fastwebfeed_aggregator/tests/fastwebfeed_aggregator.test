@@ -1,0 +1,123 @@
+<?php
+// $Id$
+/**
+ * @file
+ * Tests for Fastwebfeed Aggregator module.
+ *
+ * Copyright 2009 by Jo Bollen ("JoBo", http://drupal.org/user/111415 )
+ */
+
+class FwfAggregatorTestCase extends DrupalWebTestCase {
+  /**
+   * Implementation of getInfo().
+   */
+  public static function getInfo() {
+    return array(
+      'name' => t('Fastwebfeed Aggregator'),
+      'description' => t('<ol>
+      <li>FwfAggregatorAllCategories()<ol>
+      <li>Configure the Fastwebfeed "Plugged Module" page
+       <ol><li>ping on "cron"</li><li>for the default aggregotor feed (aggregator/rss)</li><li>for all categories (aggregator/rss/? (?= category ID))</li></ol>
+      </li>
+			<li>Add aggregator category</li>
+			<li>Add aggregator feed</li>
+			<li>Run Cron</li>
+			<li>Check watchdog logging</li>
+			<li>Verify in "aggregator" feeds</li>
+			<li>Verify Fastwebfeed info</li></ol></li>
+			</ol>'),
+      'group' => t('Fastwebfeed'),
+    );
+  }
+
+  /**
+   * Implementation of setUp().
+   */
+  function setUp() {
+    parent::setUp('fastwebfeed', 'fastwebfeed_sup', 'fastwebfeed_pubsubhubbub', 'fastwebfeed_aggregator', 'aggregator', 'devel');
+
+    // Create and login user
+    $admin_user = $this->drupalCreateUser(array('administer fastwebfeed', 'administer nodes', 'access site reports', 'administer news feeds'));
+    $this->drupalLogin($admin_user);
+    // init settings
+    variable_set('fastwebfeed_check_ping_on_node_submission_admin', '');
+    variable_set('fastwebfeed_check_node_types_all_admin', '');
+    variable_set('fastwebfeed_aggregator_check_ping_on_cron_admin', '');
+    variable_set('fastwebfeed_aggregator_check_aggregator_feed_admin', '');
+    variable_set('fastwebfeed_aggregator_check_category_all_admin', '');
+    // Activate the watchdog logging in the Fastwebfeed "settings" page admin/settings/fastwebfeed/settings
+    variable_set('fastwebfeed_check_watchdog_log_admin', '1');
+  }
+
+  /**
+   * Test Fastwebfeed. The selected hubs/services will be notified when the rss.xml is updated.
+   * When to ping (or notify)? On "node" submission.
+   * What to ping (or notify)?
+   *   Aggregator feeds:
+   *     - All node types
+   *     - All terms
+   */
+  function testFwfAggregatorAllCategories() {
+    // Configure the Fastwebfeed "Plugged Module" page admin/settings/fastwebfeed/plugged_modules
+    // ping on "node" submission
+    // for all node type
+    // for all terms
+    $edit = array();
+    $edit['fastwebfeed_aggregator_check_ping_on_cron_admin'] = 1;
+    $edit['fastwebfeed_aggregator_check_aggregator_feed_admin'] = 1;
+    $edit['fastwebfeed_aggregator_check_category_all_admin'] = 1;
+    $this->drupalPost('admin/settings/fastwebfeed/plugged_modules', $edit, t('Save configuration'));
+    $this->assertText(t('The configuration options have been saved.'), t('Configs Fastwebfeed "Plugged module" successfully saved.'));
+
+    // Add an aggregator category admin/content/aggregator/add/category
+    $edit = array();
+    $edit["title"] = $this->randomName(8);
+    $edit["description"] = $this->randomName(32);
+    $this->drupalPost('admin/content/aggregator/add/category', $edit, t('Save'));
+    $this->assertText(t('The category @title has been added.', array('@title' => $edit['title'])), t('The Fastwebeed Aggregator Category successfully created.'));
+
+    // Add an aggregator feed admin/content/aggregator/add/feed
+    $edit = array();
+    $edit["title"] = 'cupid-project.be';
+    $edit["url"] = 'http://cupid-project.be/rss.xml';
+    $edit["refresh"] = 900;
+    $edit["category[1]"] = 1;
+    $this->drupalPost('admin/content/aggregator/add/feed', $edit, t('Save'));
+    $this->assertText(t('The feed @title has been added.', array('@title' => $edit['title'])), t('The Fastwebeed Aggregator Feed successfully created.'));
+
+    // Run Cron
+    $this->drupalGet('cron.php');
+
+    // check watchdog logging
+    // ping on "node" submission
+    // for all node type
+    // for all terms
+    $this->drupalGet('admin/reports/dblog');
+    $result = db_query("SELECT * FROM {watchdog} w where w.type like '%s' ORDER BY w.wid ASC", '%fastwebfeed%');
+    while ($watchdog = db_fetch_object($result)) {
+      $this->drupalGet('admin/reports/event/'. $watchdog->wid);
+      $last_wid = $watchdog->wid;
+    }
+
+    // verify in "aggregator" feeds
+    $this->drupalGet('aggregator/rss');
+    $this->outputScreenContents('show saggregator/rss', 'testFastwebfeed');
+    $this->drupalGet('aggregator/rss/1');
+    $this->outputScreenContents('show saggregator/rss', 'testFastwebfeed');
+
+    // verify Fastwebfeed info
+    $this->drupalGet('admin/settings/fastwebfeed/info');
+  }
+
+  private function outputScreenContents($description, $basename) {
+    // This is a hack to get a directory that won't be cleaned up by simpletest
+    $file_dir = file_directory_path() .'/../simpletest_output_pages';
+    if (!is_dir($file_dir)) {
+      mkdir($file_dir, 0777, TRUE);
+    }
+    $output_path = "$file_dir/$basename." . $this->randomName(10) .'.html';
+    $rv = file_put_contents($output_path, $this->drupalGetContent());
+    $this->pass($description .": Contents of result page are ". l('here', $output_path, array('attributes' => array('target' => '_blank'))) );
+  }
+}
+

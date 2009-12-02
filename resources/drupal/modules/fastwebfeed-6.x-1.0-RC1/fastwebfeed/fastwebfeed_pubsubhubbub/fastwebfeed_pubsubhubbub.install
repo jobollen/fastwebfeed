@@ -1,0 +1,58 @@
+<?php
+// $Id$
+/**
+ * @file
+ * fastwebfeed_pubsubhubbub.install
+ * 
+ * This a ".install"-file. 
+ * 
+ * @author Jo Bollen <fastwebfeed@gmail.com>
+ * @site http://cupid-project.be/project/fastwebfeed-module
+ * @filesource
+ */
+
+/**
+ * Implementation of hook_schema().
+ */
+function fastwebfeed_pubsubhubbub_schema() {
+  $schema['pubsubhubbub_hub'] = array(
+    'description' => 'PubSubHubbub definition for your feeds.',
+    'fields' => array(
+      'pubsubhubbub_hub_id' => array('description' => 'A primary identifier for a PubSubHubbub.', 'type' => 'serial', 'unsigned' => TRUE, 'not null' => TRUE),
+      'name' => array('description' => 'The Name of a PubSubHubbub.', 'type' => 'varchar', 'length' => 32, 'not null' => TRUE, 'default' => ''),
+      'name_desc' => array('description' => 'The Description of a PubSubHubbub.', 'type' => 'varchar', 'length' => 255, 'not null' => TRUE, 'default' => ''), 
+      'url' => array('description' => 'The SUP service URL.', 'type' => 'varchar', 'length' => 500, 'not null' => TRUE, 'default' => ''),
+      'status' => array('description' => 'The status (activated or not).', 'type' => 'int', 'not null' => TRUE, 'default' => '0', 'size' => 'tiny'),
+    ),
+    'indexes' => array(
+      'pubsubhubbub_hub_name'  => array('name'),
+    ),
+    'primary key' => array('pubsubhubbub_hub_id'),
+  );
+  return $schema;
+}
+
+ /**
+ * Implementation of hook_install().
+ */
+function fastwebfeed_pubsubhubbub_install() {
+  drupal_set_message(t('Installation of the <em>fastwebfeed_pubsubhubbub.module</em> started.'));
+  drupal_install_schema('fastwebfeed_pubsubhubbub');
+  db_query("INSERT INTO {pubsubhubbub_hub} (name, name_desc, url, status) VALUES ('%s', '%s', '%s', %d)", 'google', 'Google: Gtalk, App Engine, ...', 'http://pubsubhubbub.appspot.com', '1');
+  db_query("INSERT INTO {pubsubhubbub_hub} (name, name_desc, url, status) VALUES ('%s', '%s', '%s', %d)", 'superfeedr', 'Superfeedr Pubsubhubbub Hub', 'http://superfeedr.com/hubbub', '1');
+  // admin settings
+  variable_set('fastwebfeed_pubsubhubbub_select_hub_service_admin', array('1', '2'));
+  variable_set('fastwebfeed_pubsubhubbub_check_hub_service_admin', '1');
+  // system weight of the module
+  db_query("UPDATE {system} SET weight = 5 WHERE name = 'fastwebfeed_pubsubhubbub'");
+  drupal_set_message(t('Installation of the <em>fastwebfeed_pubsubhubbub.module</em> completed.'));
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function fastwebfeed_pubsubhubbub_uninstall() {
+  drupal_uninstall_schema('fastwebfeed_pubsubhubbub');
+  variable_del('fastwebfeed_pubsubhubbub_select_hub_service_admin');
+  variable_del('fastwebfeed_pubsubhubbub_check_hub_service_admin');
+}
